@@ -4,6 +4,8 @@ import { prisma } from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
 export const authOptions: NextAuthOptions = {
+  // NextAuth v4 does not support `trustHost`; secure cookies should be enabled in production
+  useSecureCookies: process.env.NODE_ENV === "production",
   providers: [
     CredentialsProvider({
       name: "Credentials",
