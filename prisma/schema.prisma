@@ -1,0 +1,73 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum GameStatus {
+  DRAFT
+  ACTIVE
+  ARCHIVED
+}
+
+enum UserRole {
+  OWNER
+  ADMIN
+  EDITOR
+  ANALYST
+}
+
+model Game {
+  id        Int         @id @default(autoincrement())
+  title     String
+  genre     String
+  status    GameStatus  @default(DRAFT)
+  settings  Json?
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  levels    Level[]
+  analytics Analytics[]
+}
+
+model Level {
+  id          Int      @id @default(autoincrement())
+  gameId      Int      
+  levelNumber Int
+  config      Json
+  settings    Json
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  game        Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@unique([gameId, levelNumber])
+}
+
+model User {
+  id        Int         @id @default(autoincrement())
+  email     String   @unique
+  password  String
+  role      UserRole @default(ADMIN)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Analytics {
+  id        String   @id @default(cuid())
+  gameId    Int      
+  eventType String
+  data      Json
+  createdAt DateTime @default(now())
+  game      Game     @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@index([gameId])
+  @@index([eventType])
+}
