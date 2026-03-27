@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import {
   BarChart3,
+  Gem,
   Gamepad2,
   LayoutDashboard,
   LogOut,
   Settings,
   Shield,
+  Users,
   Wrench,
 } from "lucide-react";
 import { AuthGuard } from "@/components/auth/AuthGuard";
@@ -17,6 +19,8 @@ import { AuthGuard } from "@/components/auth/AuthGuard";
 const navItems = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { href: "/games", label: "Games", icon: Gamepad2 },
+  { href: "/players", label: "Players", icon: Users },
+  { href: "/boosters", label: "Boosters", icon: Gem },
   { href: "/tools", label: "Tools", icon: Wrench },
   { href: "/users", label: "Users", icon: Shield },
   { href: "/settings", label: "Settings", icon: Settings },
@@ -76,7 +80,7 @@ export function RootLayoutClient({ children }: RootLayoutClientProps) {
                   <p className="text-xs uppercase tracking-wide text-slate-400">Logged in as</p>
                   <p className="mt-1 text-sm font-medium text-slate-200">{session.user.email}</p>
                   <p className="mt-1 text-xs text-slate-400">
-                    {(session.user as any).role || "USER"}
+                    {session.user.role || "USER"}
                   </p>
                 </div>
                 <button

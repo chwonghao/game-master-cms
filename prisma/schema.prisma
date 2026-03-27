@@ -25,6 +25,11 @@ enum UserRole {
   ANALYST
 }
 
+enum BoosterCurrencyType {
+  COIN
+  GEM
+}
+
 model Game {
   id        Int         @id @default(autoincrement())
   title     String
@@ -35,6 +40,7 @@ model Game {
   updatedAt DateTime    @updatedAt
   levels    Level[]
   analytics Analytics[]
+  players   Player[]
 }
 
 model Level {
@@ -52,12 +58,14 @@ model Level {
 }
 
 model User {
-  id        Int         @id @default(autoincrement())
-  email     String   @unique
-  password  String
-  role      UserRole @default(ADMIN)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                Int       @id @default(autoincrement())
+  email             String    @unique
+  password          String
+  role              UserRole  @default(ADMIN)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  boostersCreated   Booster[] @relation("BoosterCreatedBy")
+  boostersUpdated   Booster[] @relation("BoosterUpdatedBy")
 }
 
 model Analytics {
@@ -70,4 +78,50 @@ model Analytics {
 
   @@index([gameId])
   @@index([eventType])
+}
+
+model Player {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  email        String   @unique
+  passwordHash String
+  providerId   String?  @unique
+  token        String?
+  deviceId     String?
+  sessionId    String?
+  gameId       Int?
+  coins        Int      @default(0)
+  gems         Int      @default(0)
+  currentLevel Int      @default(1)
+  xp           Int      @default(0)
+  lastLogin    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  game         Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+
+  @@index([gameId])
+  @@index([deviceId])
+  @@index([sessionId])
+  @@index([lastLogin])
+}
+
+model Booster {
+  id           Int                 @id @default(autoincrement())
+  code         String              @unique
+  name         String
+  description  String?
+  cost         Int
+  currencyType BoosterCurrencyType
+  imageUrl     String?
+  isActive     Boolean             @default(true)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  createdBy    Int
+  updatedBy    Int?
+  creator      User                @relation("BoosterCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+  updater      User?               @relation("BoosterUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([isActive])
+  @@index([createdBy])
+  @@index([updatedBy])
 }
