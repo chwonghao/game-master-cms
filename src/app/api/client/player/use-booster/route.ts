@@ -4,7 +4,6 @@ import { validateApiKey, unauthorized } from "@/lib/api-security";
 
 type UseBoosterPayload = {
   playerId?: string;
-  sessionId?: string;
   boosterId?: number;
   cost?: number;
 };
@@ -19,13 +18,12 @@ export async function POST(request: NextRequest) {
     const body = (await request.json()) as UseBoosterPayload;
 
     const playerId = typeof body.playerId === "string" ? body.playerId.trim() : "";
-    const sessionId = typeof body.sessionId === "string" ? body.sessionId.trim() : "";
     const boosterId = typeof body.boosterId === "number" ? Math.floor(body.boosterId) : NaN;
     const cost = typeof body.cost === "number" ? Math.floor(body.cost) : NaN;
 
-    if (!playerId && !sessionId) {
+    if (!playerId) {
       return NextResponse.json(
-        { error: "playerId or sessionId is required" },
+        { error: "playerId is required" },
         { status: 400 },
       );
     }
@@ -57,54 +55,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Booster not found" }, { status: 404 });
     }
 
-    const player = playerId
-      ? await prisma.player.findUnique({
-          where: { id: playerId },
-          select: { id: true },
-        })
-      : await prisma.player.findFirst({
-          where: { sessionId },
-          orderBy: { updatedAt: "desc" },
-          select: { id: true },
-        });
-
-    if (!player) {
-      return NextResponse.json({ error: "Player not found" }, { status: 404 });
-    }
-
     const updatedPlayer = await prisma.$transaction(async (tx) => {
-      if (booster.currencyType === "COIN") {
-        const updated = await tx.player.updateMany({
-          where: {
-            id: player.id,
-            coins: { gte: cost },
-          },
-          data: {
-            coins: { decrement: cost },
-          },
-        });
+      const existingPlayer = await tx.player.findUnique({
+        where: { id: playerId },
+        select: { id: true, coins: true, gems: true },
+      });
 
-        if (updated.count === 0) {
-          throw new Error("NOT_ENOUGH_BALANCE");
-        }
-      } else {
-        const updated = await tx.player.updateMany({
-          where: {
-            id: player.id,
-            gems: { gte: cost },
-          },
-          data: {
-            gems: { decrement: cost },
-          },
-        });
-
-        if (updated.count === 0) {
-          throw new Error("NOT_ENOUGH_BALANCE");
-        }
+      if (!existingPlayer) {
+        throw new Error("PLAYER_NOT_FOUND");
       }
 
+      if (booster.currencyType === "COIN") {
+        if (existingPlayer.coins < cost) {
+          throw new Error("NOT_ENOUGH_BALANCE");
+        }
+
+        await tx.player.update({
+          where: { id: existingPlayer.id },
+          data: { coins: { decrement: cost } },
+        });
+      } else {
+        if (existingPlayer.gems < cost) {
+          throw new Error("NOT_ENOUGH_BALANCE");
+        }
+
+        await tx.player.update({
+          where: { id: existingPlayer.id },
+          data: { gems: { decrement: cost } },
+        });
+      }
+
+      await tx.walletTransaction.create({
+        data: {
+          playerId: existingPlayer.id,
+          amount: -cost,
+          transactionType: "USE_BOOSTER",
+          referenceId: String(booster.id),
+        },
+      });
+
       return tx.player.findUnique({
-        where: { id: player.id },
+        where: { id: existingPlayer.id },
         select: {
           id: true,
           coins: true,
@@ -136,6 +127,10 @@ export async function POST(request: NextRequest) {
       { status: 200 },
     );
   } catch (error) {
+    if (error instanceof Error && error.message === "PLAYER_NOT_FOUND") {
+      return NextResponse.json({ error: "Player not found" }, { status: 404 });
+    }
+
     if (error instanceof Error && error.message === "NOT_ENOUGH_BALANCE") {
       return NextResponse.json({ error: "Not enough balance" }, { status: 400 });
     }

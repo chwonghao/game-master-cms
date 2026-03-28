@@ -98,11 +98,26 @@ model Player {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   game         Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
+  transactions WalletTransaction[]
 
   @@index([gameId])
   @@index([deviceId])
   @@index([sessionId])
   @@index([lastLogin])
+}
+
+model WalletTransaction {
+  id              String   @id @default(uuid())
+  playerId        String
+  amount          Int
+  transactionType String
+  referenceId     String?
+  createdAt       DateTime @default(now())
+  player          Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@index([playerId])
+  @@index([transactionType])
+  @@index([createdAt])
 }
 
 model Booster {
