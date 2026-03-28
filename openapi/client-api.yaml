@@ -1,0 +1,500 @@
+openapi: 3.0.3
+info:
+  title: GameMaster Client API Contract
+  version: 1.0.0
+  description: |
+    Official client-facing API contract for Unity integration.
+    Production endpoints are under /api/client/* and require x-api-key.
+servers:
+  - url: https://cms.nchaodev.studio
+    description: Production
+
+tags:
+  - name: Client Levels
+  - name: Client Player
+  - name: Client Boosters
+  - name: Client Economy
+  - name: Legacy
+
+components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: x-api-key
+
+  schemas:
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    PlayerInitRequest:
+      type: object
+      properties:
+        username:
+          type: string
+        providerId:
+          type: string
+        deviceId:
+          type: string
+          nullable: true
+        sessionId:
+          type: string
+          nullable: true
+        gameId:
+          oneOf:
+            - type: integer
+            - type: string
+      required:
+        - username
+        - providerId
+
+    PlayerInitResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          example: success
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+            username:
+              type: string
+            providerId:
+              type: string
+              nullable: true
+            deviceId:
+              type: string
+              nullable: true
+            sessionId:
+              type: string
+              nullable: true
+            coins:
+              type: integer
+            gems:
+              type: integer
+            currentLevel:
+              type: integer
+            xp:
+              type: integer
+            gameId:
+              type: integer
+              nullable: true
+            game:
+              type: object
+              nullable: true
+              properties:
+                id:
+                  type: integer
+                title:
+                  type: string
+            lastLogin:
+              type: string
+              format: date-time
+              nullable: true
+            createdAt:
+              type: string
+              format: date-time
+          required:
+            - id
+            - username
+            - coins
+            - gems
+            - currentLevel
+            - xp
+      required:
+        - status
+        - data
+
+    BoosterItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        code:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        cost:
+          type: integer
+        currencyType:
+          type: string
+          enum: [COIN, GEM]
+        imageUrl:
+          type: string
+          nullable: true
+        isActive:
+          type: boolean
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - code
+        - name
+        - cost
+        - currencyType
+        - isActive
+
+    BoostersListResponse:
+      type: object
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BoosterItem'
+        count:
+          type: integer
+      required:
+        - data
+        - count
+
+    LevelTube:
+      type: object
+      properties:
+        wools:
+          type: array
+          items:
+            type: integer
+      required:
+        - wools
+
+    ClientLevelResponse:
+      type: object
+      properties:
+        level_id:
+          type: integer
+        settings:
+          type: object
+          properties:
+            tube_capacity:
+              type: integer
+            undo_limit:
+              type: integer
+          required:
+            - tube_capacity
+            - undo_limit
+        tubes:
+          type: array
+          items:
+            $ref: '#/components/schemas/LevelTube'
+      required:
+        - level_id
+        - settings
+        - tubes
+
+    UseBoosterRequest:
+      type: object
+      properties:
+        playerId:
+          type: string
+        boosterId:
+          type: integer
+        cost:
+          type: integer
+      required:
+        - playerId
+        - boosterId
+        - cost
+
+    UseBoosterResponse:
+      type: object
+      properties:
+        message:
+          type: string
+          example: Booster used successfully
+        data:
+          type: object
+          properties:
+            playerId:
+              type: string
+            boosterId:
+              type: integer
+            currencyType:
+              type: string
+              enum: [COIN, GEM]
+            cost:
+              type: integer
+            balance:
+              type: object
+              properties:
+                coins:
+                  type: integer
+                gems:
+                  type: integer
+              required:
+                - coins
+                - gems
+            updatedAt:
+              type: string
+              format: date-time
+          required:
+            - playerId
+            - boosterId
+            - currencyType
+            - cost
+            - balance
+      required:
+        - message
+        - data
+
+paths:
+  /api/client/games/{gameId}/levels/{levelId}:
+    get:
+      tags: [Client Levels]
+      summary: Get level detail for game client (official production endpoint)
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: path
+          name: gameId
+          required: true
+          schema:
+            type: integer
+        - in: path
+          name: levelId
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Level payload for client runtime
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ClientLevelResponse'
+              examples:
+                success:
+                  value:
+                    level_id: 25
+                    settings:
+                      tube_capacity: 4
+                      undo_limit: 5
+                    tubes:
+                      - wools: [0, 1, 2, 3]
+                      - wools: [3, 2, 1, 0]
+        '400':
+          description: Invalid route parameters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid or missing API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Level not found or game-level mismatch
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/client/player/init:
+    post:
+      tags: [Client Player]
+      summary: Initialize or upsert player session by provider identity
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlayerInitRequest'
+            examples:
+              default:
+                value:
+                  username: player_001
+                  providerId: google_abc123
+                  deviceId: device_xyz
+                  sessionId: sess_001
+                  gameId: 1
+      responses:
+        '200':
+          description: Player initialized successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlayerInitResponse'
+        '400':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Username already taken
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/client/boosters:
+    get:
+      tags: [Client Boosters]
+      summary: Get active boosters for game client
+      security:
+        - ApiKeyAuth: []
+      parameters:
+        - in: query
+          name: gameId
+          required: true
+          schema:
+            oneOf:
+              - type: integer
+              - type: string
+      responses:
+        '200':
+          description: Active boosters list
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BoostersListResponse'
+              examples:
+                success:
+                  value:
+                    data:
+                      - id: 1
+                        code: UNDO
+                        name: Undo Move
+                        description: Undo last move
+                        cost: 100
+                        currencyType: COIN
+                        imageUrl: null
+                        isActive: true
+                        createdAt: '2026-03-28T00:00:00.000Z'
+                        updatedAt: '2026-03-28T00:00:00.000Z'
+                    count: 1
+        '400':
+          description: gameId query parameter is required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/client/player/use-booster:
+    post:
+      tags: [Client Economy]
+      summary: Deduct player balance and write wallet transaction audit log
+      security:
+        - ApiKeyAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UseBoosterRequest'
+            examples:
+              default:
+                value:
+                  playerId: 624f4fd7-1d6f-4a8a-a9cc-220f6f89f791
+                  boosterId: 2
+                  cost: 50
+      responses:
+        '200':
+          description: Booster usage completed and new balance returned
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UseBoosterResponse'
+        '400':
+          description: Not enough balance or invalid payload
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                notEnoughBalance:
+                  value:
+                    error: Not enough balance
+        '401':
+          description: Invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Player or booster not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/levels/{id}:
+    get:
+      tags: [Legacy]
+      summary: Legacy level endpoint (deprecated)
+      deprecated: true
+      description: |
+        Legacy endpoint retained for backward compatibility only.
+        Do not use for new Unity production integration.
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: Legacy level payload
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Invalid level id
+        '404':
+          description: Level not found
+        '500':
+          description: Internal server error
