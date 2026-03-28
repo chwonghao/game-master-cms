@@ -75,10 +75,11 @@ export async function GET(
       return NextResponse.json({ error: "Invalid route parameters" }, { status: 400 });
     }
 
-    // Fetch the level from the database
-    const level = await prisma.level.findUnique({
+    // Accept both DB level id and human levelNumber to avoid client-side mismatch.
+    const level = await prisma.level.findFirst({
       where: {
-        id: levelIdInt,
+        gameId: gameIdInt,
+        OR: [{ id: levelIdInt }, { levelNumber: levelIdInt }],
       },
       include: {
         game: {
@@ -90,11 +91,6 @@ export async function GET(
     });
 
     if (!level) {
-      return NextResponse.json({ error: "Level not found" }, { status: 404 });
-    }
-
-    // Verify the level belongs to the requested game
-    if (level.gameId !== gameIdInt) {
       return NextResponse.json({ error: "Level not found" }, { status: 404 });
     }
 
