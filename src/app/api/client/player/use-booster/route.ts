@@ -19,7 +19,7 @@ export async function POST(request: NextRequest) {
 
     const playerId = typeof body.playerId === "string" ? body.playerId.trim() : "";
     const boosterId = typeof body.boosterId === "number" ? Math.floor(body.boosterId) : NaN;
-    const cost = typeof body.cost === "number" ? Math.floor(body.cost) : NaN;
+    const requestedCost = typeof body.cost === "number" ? Math.floor(body.cost) : undefined;
 
     if (!playerId) {
       return NextResponse.json(
@@ -35,17 +35,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (!Number.isInteger(cost) || cost < 0) {
-      return NextResponse.json(
-        { error: "cost must be a non-negative integer" },
-        { status: 400 },
-      );
-    }
-
     const booster = await prisma.booster.findUnique({
       where: { id: boosterId },
       select: {
         id: true,
+        cost: true,
         isActive: true,
         currencyType: true,
       },
@@ -55,10 +49,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Booster not found" }, { status: 404 });
     }
 
+    const serverCost = booster.cost;
+    if (requestedCost !== undefined && requestedCost !== serverCost) {
+      console.warn(
+        `[/api/client/player/use-booster] Client cost mismatch for booster ${booster.id}. client=${requestedCost}, server=${serverCost}`,
+      );
+    }
+
     const updatedPlayer = await prisma.$transaction(async (tx) => {
       const existingPlayer = await tx.player.findUnique({
         where: { id: playerId },
-        select: { id: true, coins: true, gems: true },
+        select: { id: true },
       });
 
       if (!existingPlayer) {
@@ -66,29 +67,39 @@ export async function POST(request: NextRequest) {
       }
 
       if (booster.currencyType === "COIN") {
-        if (existingPlayer.coins < cost) {
+        const updated = await tx.player.updateMany({
+          where: {
+            id: existingPlayer.id,
+            coins: { gte: serverCost },
+          },
+          data: {
+            coins: { decrement: serverCost },
+          },
+        });
+
+        if (updated.count === 0) {
           throw new Error("NOT_ENOUGH_BALANCE");
         }
-
-        await tx.player.update({
-          where: { id: existingPlayer.id },
-          data: { coins: { decrement: cost } },
-        });
       } else {
-        if (existingPlayer.gems < cost) {
+        const updated = await tx.player.updateMany({
+          where: {
+            id: existingPlayer.id,
+            gems: { gte: serverCost },
+          },
+          data: {
+            gems: { decrement: serverCost },
+          },
+        });
+
+        if (updated.count === 0) {
           throw new Error("NOT_ENOUGH_BALANCE");
         }
-
-        await tx.player.update({
-          where: { id: existingPlayer.id },
-          data: { gems: { decrement: cost } },
-        });
       }
 
       await tx.walletTransaction.create({
         data: {
           playerId: existingPlayer.id,
-          amount: -cost,
+          amount: -serverCost,
           transactionType: "USE_BOOSTER",
           referenceId: String(booster.id),
         },
@@ -116,7 +127,7 @@ export async function POST(request: NextRequest) {
           playerId: updatedPlayer.id,
           boosterId: booster.id,
           currencyType: booster.currencyType,
-          cost,
+          cost: serverCost,
           balance: {
             coins: updatedPlayer.coins,
             gems: updatedPlayer.gems,
