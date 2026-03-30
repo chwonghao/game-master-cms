@@ -3,6 +3,11 @@ export type DifficultyTag = "Easy" | "Medium" | "Hard" | "Expert";
 export type UserRole = "OWNER" | "ADMIN" | "EDITOR" | "ANALYST";
 export type BoosterCurrencyType = "COIN" | "GEM";
 
+export type BoosterRewardItem = {
+  boosterId: number;
+  quantity: number;
+};
+
 export type LevelConfig = {
   tubes: Array<{
     wools: number[];
@@ -91,4 +96,19 @@ export type PlayerRecord = {
     id: number;
     title: string;
   } | null;
+};
+
+export type ShopPackageRecord = {
+  id: number;
+  name: string;
+  description?: string | null;
+  packageType: string;
+  price: number;
+  currency: string;
+  coinReward: number;
+  gemReward: number;
+  boosterRewards: BoosterRewardItem[];
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
 };

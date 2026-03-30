@@ -99,6 +99,7 @@ model Player {
   updatedAt    DateTime @updatedAt
   game         Game?    @relation(fields: [gameId], references: [id], onDelete: SetNull)
   transactions WalletTransaction[]
+  inventory    PlayerInventory[]
 
   @@index([gameId])
   @@index([deviceId])
@@ -139,4 +140,35 @@ model Booster {
   @@index([isActive])
   @@index([createdBy])
   @@index([updatedBy])
+}
+
+model ShopPackage {
+  id              Int    @id @default(autoincrement())
+  name            String
+  description     String?
+  packageType     String
+  price           Float
+  currency        String
+  coinReward      Int    @default(0)
+  gemReward       Int    @default(0)
+  boosterRewards  Json   @default("[]")
+  isActive        Boolean @default(true)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([isActive])
+  @@index([packageType])
+}
+
+model PlayerInventory {
+  id        String  @id @default(uuid())
+  playerId  String
+  boosterId Int
+  quantity  Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  player    Player  @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  @@unique([playerId, boosterId])
+  @@index([playerId])
 }

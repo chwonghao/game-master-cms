@@ -12,11 +12,25 @@ if (!connectionString) {
 
 const adapter = new PrismaPg({ connectionString });
 
-export const prisma =
-  globalForPrisma.prisma ??
-  new PrismaClient({
+function createPrismaClient() {
+  return new PrismaClient({
     adapter,
   });
+}
+
+function hasLatestDelegates(client: PrismaClient | undefined): client is PrismaClient {
+  if (!client) {
+    return false;
+  }
+
+  const maybeClient = client as unknown as Record<string, unknown>;
+  return "shopPackage" in maybeClient && "playerInventory" in maybeClient;
+}
+
+export const prisma =
+  hasLatestDelegates(globalForPrisma.prisma)
+    ? globalForPrisma.prisma
+    : createPrismaClient();
 
 if (process.env.NODE_ENV !== "production") {
   globalForPrisma.prisma = prisma;
